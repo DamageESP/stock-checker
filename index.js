@@ -35,7 +35,7 @@ function timeStamp () {
   }
 
 async function checkStock () {
-  const browser = await puppeteer.launch()
+  const browser = await puppeteer.launch({args: ['--no-sandbox']})
 
   const tab = await browser.newPage()
   await tab.goto('https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
