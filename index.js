@@ -34,33 +34,36 @@ function timeStamp () {
     return date.join('/') + ' ' + time.join(':') + ' ' + suffix
   }
 
-async function checkStock () {
+async function init () {
   const browser = await puppeteer.launch({args: ['--no-sandbox']})
 
-  const tab = await browser.newPage()
-  await tab.goto('https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
-  const isInStock = await tab.evaluate(() => {
-    return document.querySelector('.btn.buy').innerText !== 'Avísame]'
-  })
-  if (isInStock) {
-    const formData = new FormData()
-    formData.append('app_key', config.app_key)
-    formData.append('app_secret', config.app_secret)
-    formData.append('target_type', 'app')
-    formData.append('content', 'Hay stock de Gigabyte GeForce RTX 3070 EAGLE OC 8GB GDDR6')
-    formData.append('content_type', 'url')
-    formData.append('content_extra', 'https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
-    
-    await fetch('https://api.pushed.co/1/push', {
-      method: 'POST',
-      body: formData
+  const checkStock = async () => {
+    const tab = await browser.newPage()
+    await tab.goto('https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
+    const isInStock = await tab.evaluate(() => {
+      return document.querySelector('.btn.buy').innerText !== 'Avísame]'
     })
-    console.log(`[${timeStamp()}] SÍ hay stock`)
-  } else {
-    console.log(`[${timeStamp()}] No hay stock`)
+    if (isInStock) {
+      const formData = new FormData()
+      formData.append('app_key', config.app_key)
+      formData.append('app_secret', config.app_secret)
+      formData.append('target_type', 'app')
+      formData.append('content', 'Hay stock de Gigabyte GeForce RTX 3070 EAGLE OC 8GB GDDR6')
+      formData.append('content_type', 'url')
+      formData.append('content_extra', 'https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
+      
+      await fetch('https://api.pushed.co/1/push', {
+        method: 'POST',
+        body: formData
+      })
+      console.log(`[${timeStamp()}] SÍ hay stock`)
+    } else {
+      console.log(`[${timeStamp()}] No hay stock`)
+    }
+    await tab.close()
   }
-  await tab.close()
+  setInterval(checkStock, 60 * 1000)
+  checkStock()
 }
 
-setInterval(checkStock, 60 * 1000)
-checkStock()
+init()
