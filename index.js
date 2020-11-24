@@ -39,27 +39,34 @@ async function init () {
 
   const checkStock = async () => {
     const tab = await browser.newPage()
-    await tab.goto('https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
-    const isInStock = await tab.evaluate(() => {
-      return document.querySelector('.btn.buy').innerText !== 'Avísame]'
-    })
-    if (isInStock) {
-      const formData = new FormData()
-      formData.append('app_key', config.app_key)
-      formData.append('app_secret', config.app_secret)
-      formData.append('target_type', 'app')
-      formData.append('content', 'Hay stock de Gigabyte GeForce RTX 3070 EAGLE OC 8GB GDDR6')
-      formData.append('content_type', 'url')
-      formData.append('content_extra', 'https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6')
-      
-      await fetch('https://api.pushed.co/1/push', {
-        method: 'POST',
-        body: formData
+
+    const checkProduct = async (productUrl, productName) => {
+      await tab.goto(productUrl)
+      const isInStock = await tab.evaluate(() => {
+        return document.querySelector('.btn.buy').innerText !== 'Avísame]'
       })
-      console.log(`[${timeStamp()}] SÍ hay stock`)
-    } else {
-      console.log(`[${timeStamp()}] No hay stock`)
+      if (isInStock) {
+        const formData = new FormData()
+        formData.append('app_key', config.app_key)
+        formData.append('app_secret', config.app_secret)
+        formData.append('target_type', 'app')
+        formData.append('content', `Hay stock de ${productName}`)
+        formData.append('content_type', 'url')
+        formData.append('content_extra', productUrl)
+        
+        await fetch('https://api.pushed.co/1/push', {
+          method: 'POST',
+          body: formData
+        })
+        console.log(`[${timeStamp()}] SÍ hay stock de ${productName}`)
+      } else {
+        console.log(`[${timeStamp()}] No hay stock de ${productName}`)
+      }
     }
+
+    await checkProduct('https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6', 'Gigabyte GeForce RTX 3070 EAGLE OC 8GB GDDR6')
+    await checkProduct('https://www.pccomponentes.com/msi-geforce-rtx-3070-gaming-x-trio-8gb-gddr6', 'MSI GeForce RTX 3070 GAMING X TRIO 8GB GDDR6')
+
     await tab.close()
   }
   setInterval(checkStock, 60 * 1000)
