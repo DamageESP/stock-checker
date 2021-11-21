@@ -4,7 +4,6 @@ import { Product, ProductDataLog } from './types';
 
 const puppeteer = require('puppeteer')
 const serviceAccount = require("../lib/credentials.json")
-const productList = require('../lib/productList.json')
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -31,10 +30,14 @@ async function init() {
     })
 
     console.log('checking product', productData.name)
+    const queryDate = Date.now()
     const newEntry = db.ref('data').push({
-      ...productData,
+      productName: productData.name,
+      productId: productData.id,
+      productUrl: productData.url,
+      productSite: productData.site,
       loading: true,
-      date: Date.now(),
+      date: queryDate,
     })
     try {
       await tab.goto(productData.url)
@@ -42,9 +45,16 @@ async function init() {
       newEntry.update({
         loading: false,
         isInStock: productInformation.isInStock,
-        price: productInformation.price,
+        productPrice: productInformation.price,
       })
       if (productInformation.isInStock) {
+        db.ref(`/latestStock/${productData.id}`).set({
+          productName: productData.name,
+          productPrice: productInformation.price,
+          productUrl: productData.url,
+          productSite: productData.site,
+          date: queryDate,
+        })
         sendNotification(productData)
           .catch((e: Error) => {
             console.log(`[${timeStamp()}] No se ha podido enviar la notificación de Pushed`, e.message)
@@ -81,9 +91,27 @@ async function init() {
         }, i * 15 * 1000)
       })
     }))
-    setTimeout(() => checkStock(productList), 15 * 1000)
+    const productData = await db.ref('/products').get()
+    if (!productData.val()) {
+      db.ref('/errors').push({
+        msg: `No se han encontrado productos para comprobar.`,
+        date: Date.now(),
+      })
+      return
+    }
+    const newProductList: Product[] = Object.entries(productData.val()).map(([key, value]: [string, Product]) => ({ id: key, ...value }))
+    setTimeout(() => checkStock(newProductList), 15 * 1000)
   }
 
+  const productData = await db.ref('/products').get()
+  if (!productData.val()) {
+    db.ref('/errors').push({
+      msg: `No se han encontrado productos para comprobar.`,
+      date: Date.now(),
+    })
+    return
+  }
+  const productList: Product[] = Object.entries(productData.val()).map(([key, value]: [string, Product]) => ({ id: key, ...value }))
   checkStock(productList)
 }
 

@@ -2,9 +2,9 @@ import './reset.scss';
 import './App.scss';
 
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onChildAdded, onChildChanged } from "firebase/database";
+import { getDatabase, ref, onChildAdded, onChildChanged, limitToLast, query, orderByChild, endBefore } from "firebase/database";
 import { useEffect, useState } from 'react'
-import { format } from 'timeago.js';
+import { DataItem } from './components/data-item';
 
 const firebaseConfig = {
   apiKey: "AIzaSyD4XxIuiekhE84uh7_IIVX8Fzf3wXYCcDA",
@@ -21,16 +21,33 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const dataRef = ref(db, '/data')
+const stockRef = ref(db, '/latestStock')
+const last50DataRef = query(dataRef, limitToLast(50))
+const lastHourInStock = query(stockRef, limitToLast(50))
 
 function App() {
   const [data, setData] = useState([])
+  const [inStockItems, setInStockItems] = useState([])
+  const [loading, setLoading] = useState(false)
 
   const addData = newItems => {
     setData(curData => [...curData, ...newItems])
   }
 
+  const addInStock = newItems => {
+    setInStockItems(curData => [...curData, ...newItems])
+  }
+
   const replaceData = dataItem => {
     setData(curData => {
+      const copy = [...curData]
+      copy[copy.findIndex(cd => cd.key === dataItem.key)] = dataItem
+      return copy
+    })
+  }
+
+  const replaceInStock = dataItem => {
+    setInStockItems(curData => {
       const copy = [...curData]
       copy[copy.findIndex(cd => cd.key === dataItem.key)] = dataItem
       return copy
@@ -43,45 +60,53 @@ function App() {
       console.log('get', data);
       setData(data)
     }) */
-    onChildAdded(dataRef, (snapshot) => {
+    setLoading(true)
+    onChildAdded(last50DataRef, (snapshot) => {
       const data = {
         key: snapshot.key,
         ...snapshot.val(),
       }
-      console.log('new Child', snapshot.key, data);
+      setLoading(false)
       addData([data])
     })
-    onChildChanged(dataRef, (snapshot) => {
+    onChildAdded(lastHourInStock, (snapshot) => {
       const data = {
         key: snapshot.key,
         ...snapshot.val(),
       }
-      console.log('updated Child', snapshot.key, data);
+      addInStock([data])
+    })
+    onChildChanged(lastHourInStock, (snapshot) => {
+      const data = {
+        key: snapshot.key,
+        ...snapshot.val(),
+      }
+      replaceInStock(data)
+    })
+    onChildChanged(last50DataRef, (snapshot) => {
+      const data = {
+        key: snapshot.key,
+        ...snapshot.val(),
+      }
       replaceData(data)
     })
   }, [])
 
   return (
     <div className="app">
-      <h1 className="heading">Latest data</h1>
+      <h1 className="heading">En stock</h1>
       <div className="data">
-        {data.sort((a, b) => a.date > b.date ? -1 : 1).map(d => (
-          <div className={`dataItem${d.loading ? ' loading' : d.isInStock ? ' inStock' : ' notInStock'}`} key={d.key}>
-            <div className="leftContent">
-              <header className="headerContent">
-                <span>{d.loading ? <img alt="" className="loadingSpinner" src="loading.svg" /> : d.price ? d.isInStock ? '✔️' : '❌' : '❔'}</span>
-                <span className="name">{d.name}</span>
-              </header>
-              <div className="smallContent">
-                <span className="timestamp">{format(new Date(d.date), 'es_ES')}</span>
-                <span className="site">- @{d.site}</span>
-              </div>
-            </div>
-            <div className="rightContent">
-              <span className="price">{d.price ? d.price : d.loading ? <img alt="" className="loadingSpinner" src="loading.svg" /> : '❔'} EUR</span>
-              <a rel="noreferrer" target="_blank" href={d.url} className="visitButton">🔗 Visit</a>
-            </div>
-          </div>
+        {inStockItems.map(d => ({ ...d, isInStock: true })).map(d => (
+          <DataItem dataItem={d} key={d.key} />
+        ))}
+      </div>
+      <h1 className="heading">Latest data</h1>
+      <div className="filters">
+
+      </div>
+      <div className="data">
+        {loading ? 'Recuperando datos...' : data.sort((a, b) => a.date > b.date ? -1 : 1).map(d => (
+          <DataItem dataItem={d} key={d.key} />
         ))}
       </div>
     </div>

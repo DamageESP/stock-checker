@@ -1,4 +1,5 @@
 export interface Product {
+  id: string,
   site: string,
   url: string,
   name: string,
