@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://www.pccomponentes.com/msi-geforce-rtx-3070-gaming-x-trio-8gb-gddr6",
+    "name": "MSI GeForce RTX 3070 GAMING X TRIO 8GB GDDR6",
+    "site": "pccomponentes"
+  },
+  {
+    "url": "https://www.pccomponentes.com/gigabyte-geforce-rtx-3070-eagle-oc-8gb-gddr6",
+    "name": "Gigabyte GeForce RTX 3070 EAGLE OC 8GB GDDR6",
+    "site": "pccomponentes"
+  },
+  {
+    "url": "https://www.coolmod.com/msi-geforce-rtx-3060-ti-ventus-2x-v1-lhr-8gb-gddr6-vga/",
+    "name": "MSI GeForce RTX 3060 Ti VENTUS 2X V1 LHR 8GB GDDR6 - VGA",
+    "site": "coolmod"
+  },
+  {
+    "url": "https://www.coolmod.com/gigabyte-geforce-rtx-3060-ti-aorus-elite-lhr-8gb-gddr6-tarjeta-grafica/",
+    "name": "Gigabyte GeForce RTX 3060 Ti AORUS ELITE LHR 8GB GDDR6 - VGA",
+    "site": "coolmod"
+  }
+]
