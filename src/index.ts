@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin'
 import { sendNotification, timeStamp } from "../utils"
-import { Product, ProductDataLog } from './types';
+import { Product } from './types';
 
 const puppeteer = require('puppeteer')
 const serviceAccount = require("../lib/credentials.json")
@@ -55,17 +55,19 @@ async function init() {
           productSite: productData.site,
           date: queryDate,
         })
-        sendNotification(productData)
-          .catch((e: Error) => {
-            console.log(`[${timeStamp()}] No se ha podido enviar la notificación de Pushed`, e.message)
-            db.ref('/errors').push({
-              msg: 'No se ha podido enviar la notificación de Pushed',
-              date: Date.now(),
-              details: e.message,
-            })
+        try {
+          await sendNotification(productData)
+        } catch (e) {
+          console.log(`[${timeStamp()}] No se ha podido enviar la notificación de Pushed`, e.message)
+          db.ref('/errors').push({
+            msg: 'No se ha podido enviar la notificación de Pushed',
+            date: Date.now(),
+            details: e.message,
           })
+        }
         console.log(`[${timeStamp()}] SÍ hay stock de ${productData.name} en @${productData.site}`)
       } else {
+        db.ref(`/latestStock/${productData.id}`).remove()
         console.log(`[${timeStamp()}] NO hay stock de ${productData.name} en @${productData.site}`)
       }
     } catch (e) {
