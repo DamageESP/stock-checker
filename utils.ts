@@ -1,6 +1,7 @@
 import config from "./config"
 import fetch from 'node-fetch'
 import { Product } from "./src/types"
+import { appendFile } from 'fs/promises'
 
 // https://gist.github.com/hurjas/2660489
 export function timeStamp() {
@@ -48,4 +49,15 @@ export async function sendNotification(productData: Product) {
     method: 'POST',
     body: formData,
   })
+}
+
+export function log(...info: string[]): void {
+  console.log(...info.map(l => `[${timeStamp()}] ${l}`))
+  appendFile('log', info.map(l => `[${timeStamp()}] ${l}`).join('\n'), 'utf8')
+    .catch(() => { })
+}
+
+export function todayYYYYMDD() {
+  const date = new Date()
+  return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
 }

@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin'
-import { sendNotification, timeStamp } from "../utils"
-import { Product } from './types';
+import { log, sendNotification, todayYYYYMDD } from "../utils"
+import { EvaluationResponse, Product } from './types';
 
 const puppeteer = require('puppeteer')
 const serviceAccount = require("../lib/credentials.json")
@@ -29,7 +29,7 @@ async function init() {
       'Accept-Language': 'es'
     })
 
-    console.log('checking product', productData.name)
+    log('checking product ' + productData.name)
     const queryDate = Date.now()
     const newEntry = db.ref('data').push({
       productName: productData.name,
@@ -41,7 +41,7 @@ async function init() {
     })
     try {
       await tab.goto(productData.url)
-      const productInformation = await tab.evaluate(siteEvaluator)
+      const productInformation: EvaluationResponse = await tab.evaluate(siteEvaluator)
       newEntry.update({
         loading: false,
         isInStock: productInformation.isInStock,
@@ -58,20 +58,50 @@ async function init() {
         try {
           await sendNotification(productData)
         } catch (e) {
-          console.log(`[${timeStamp()}] No se ha podido enviar la notificación de Pushed`, e.message)
+          log(`No se ha podido enviar la notificación de Pushed\n${e.message}`)
           db.ref('/errors').push({
             msg: 'No se ha podido enviar la notificación de Pushed',
             date: Date.now(),
             details: e.message,
           })
         }
-        console.log(`[${timeStamp()}] SÍ hay stock de ${productData.name} en @${productData.site}`)
+        log(`SÍ hay stock de ${productData.name} en @${productData.site}`)
       } else {
-        db.ref(`/latestStock/${productData.id}`).remove()
-        console.log(`[${timeStamp()}] NO hay stock de ${productData.name} en @${productData.site}`)
+        const inStockProduct = await db.ref(`/latestStock/${productData.id}`).get()
+        if (inStockProduct.exists()) {
+          db.ref(`/sales`).push({
+            productId: productData.id,
+            productName: productData.name,
+            productUrl: productData.url,
+            productSite: productData.site,
+            productPrice: inStockProduct.val().productPrice,
+            date: Date.now(),
+          })
+          const currentAvgPrice = await db.ref(`/avgPrices/${productData.id}`).get()
+          const numSales = currentAvgPrice.exists() ? parseInt(currentAvgPrice.val().numSales) + 1 : 1
+          let averagePrice = parseFloat(inStockProduct.val().productPrice)
+          const previousPrices = await db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).get()
+          if (previousPrices.exists()) {
+            averagePrice = (previousPrices.val() as number[]).reduce((acc, cur) => {
+              acc += cur
+              return acc
+            }, parseFloat(inStockProduct.val().productPrice)) / ((previousPrices.val() as number[]).length + 1)
+          }
+          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).push(parseFloat(inStockProduct.val().productPrice))
+          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}`).set({
+            productName: productData.name,
+            productUrl: productData.url,
+            productSite: productData.site,
+            numSales,
+            averagePrice,
+            lastSale: Date.now(),
+          })
+          log(`Se ha vendido ${productData.name} a un precio de ${inStockProduct.val().productPrice} en @${productData.site}`)
+        }
+        log(`NO hay stock de ${productData.name} en @${productData.site}`)
       }
     } catch (e) {
-      console.log(`[${timeStamp()}] No se ha podido obtener información de ${productData.name} en @${productData.site}`, e)
+      log(`No se ha podido obtener información de ${productData.name} en @${productData.site}\n${e}`)
       db.ref('/errors').push({
         msg: `No se ha podido obtener información de ${productData.name} en @${productData.site}`,
         date: Date.now(),

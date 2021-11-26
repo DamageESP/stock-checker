@@ -12,7 +12,7 @@ export interface ProductDataLog extends Product {
   price?: string,
 }
 
-export interface ParserResponse {
+export interface EvaluationResponse {
   isInStock: boolean,
   price: string,
 }
