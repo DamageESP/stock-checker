@@ -87,7 +87,6 @@ async function init() {
               return acc
             }, parseFloat(inStockProduct.val().productPrice)) / ((previousPrices.val() as number[]).length + 1)
           }
-          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).push(parseFloat(inStockProduct.val().productPrice))
           db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}`).set({
             productName: productData.name,
             productUrl: productData.url,
@@ -96,6 +95,7 @@ async function init() {
             averagePrice,
             lastSale: Date.now(),
           })
+          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).push(parseFloat(inStockProduct.val().productPrice))
           log(`Se ha vendido ${productData.name} a un precio de ${inStockProduct.val().productPrice} en @${productData.site}`)
         }
         log(`NO hay stock de ${productData.name} en @${productData.site}`)
