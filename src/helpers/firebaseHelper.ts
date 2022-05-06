@@ -1,0 +1,1 @@
+export const mapKeyToId = ([key, value]: [string, any]) => ({ id: key, ...value })

@@ -1,22 +1,15 @@
-import * as admin from 'firebase-admin'
-import { log, sendNotification, todayYYYYMDD } from "../utils"
+import { calculateAveragePrice, log, sendNotification } from "../utils"
+import { setProductStock, createEmptyEvaluationData, postSale, updateEvaluationData, getStockForProduct, getAveragePriceDataForProduct, getSellingPricesForProduct, setSellingDataForProduct, addSellingPriceForProduct, getProductList, deleteProductStock } from './services/productService';
 import { EvaluationResponse, Product } from './types';
+import { mapKeyToId } from './helpers/firebaseHelper';
 
 const puppeteer = require('puppeteer')
-const serviceAccount = require("../lib/credentials.json")
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://price-tracker-1c428.firebaseio.com",
-})
-
-const db = admin.database()
-
-async function init() {
+export async function programLoop() {
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: '/usr/bin/chromium-browser',
-    args: ['--no-sandbox'],
+    /* executablePath: '/usr/bin/chromium-browser',
+    args: ['--no-sandbox'], */
   })
 
   const checkProduct = async (productData: Product) => {
@@ -31,82 +24,39 @@ async function init() {
 
     log('checking product ' + productData.name)
     const queryDate = Date.now()
-    const newEntry = db.ref('data').push({
-      productName: productData.name,
-      productId: productData.id,
-      productUrl: productData.url,
-      productSite: productData.site,
-      loading: true,
-      date: queryDate,
-    })
+    const newEntry = createEmptyEvaluationData(productData, queryDate)
     try {
       await tab.goto(productData.url)
-      const productInformation: EvaluationResponse = await tab.evaluate(siteEvaluator)
-      newEntry.update({
-        loading: false,
-        isInStock: productInformation.isInStock,
-        productPrice: productInformation.price,
-      })
-      if (productInformation.isInStock) {
-        db.ref(`/latestStock/${productData.id}`).set({
-          productName: productData.name,
-          productPrice: productInformation.price,
-          productUrl: productData.url,
-          productSite: productData.site,
-          date: queryDate,
-        })
+      const evaluationData: EvaluationResponse = await tab.evaluate(siteEvaluator)
+      updateEvaluationData(newEntry, evaluationData)
+      if (evaluationData.isInStock) {
+        setProductStock(productData, evaluationData, queryDate)
         try {
           await sendNotification(productData)
-        } catch (e) {
+        } catch (e: any) {
           log(`No se ha podido enviar la notificación de Pushed\n${e.message}`)
-          db.ref('/errors').push({
-            msg: 'No se ha podido enviar la notificación de Pushed',
-            date: Date.now(),
-            details: e.message,
-          })
         }
         log(`SÍ hay stock de ${productData.name} en @${productData.site}`)
       } else {
-        const inStockProduct = await db.ref(`/latestStock/${productData.id}`).get()
+        const inStockProduct = await getStockForProduct(productData.id)
         if (inStockProduct.exists()) {
-          db.ref(`/sales`).push({
-            productId: productData.id,
-            productName: productData.name,
-            productUrl: productData.url,
-            productSite: productData.site,
-            productPrice: inStockProduct.val().productPrice,
-            date: Date.now(),
-          })
-          const currentAvgPrice = await db.ref(`/avgPrices/${productData.id}`).get()
+          postSale(productData, inStockProduct.val().productPrice)
+          const currentAvgPrice = await getAveragePriceDataForProduct(productData.id)
           const numSales = currentAvgPrice.exists() ? parseInt(currentAvgPrice.val().numSales) + 1 : 1
           let averagePrice = parseFloat(inStockProduct.val().productPrice)
-          const previousPrices = await db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).get()
+          const previousPrices = await getSellingPricesForProduct(productData.id)
           if (previousPrices.exists()) {
-            averagePrice = (previousPrices.val() as number[]).reduce((acc, cur) => {
-              acc += cur
-              return acc
-            }, parseFloat(inStockProduct.val().productPrice)) / ((previousPrices.val() as number[]).length + 1)
+            averagePrice = calculateAveragePrice(Object.values(previousPrices.val() as number[]), parseFloat(inStockProduct.val().productPrice))
           }
-          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}`).set({
-            productName: productData.name,
-            productUrl: productData.url,
-            productSite: productData.site,
-            numSales,
-            averagePrice,
-            lastSale: Date.now(),
-          })
-          db.ref(`/sellingPrices/${productData.id}/${todayYYYYMDD()}/prices`).push(parseFloat(inStockProduct.val().productPrice))
+          setSellingDataForProduct(productData, numSales, averagePrice)
+          addSellingPriceForProduct(productData, parseFloat(inStockProduct.val().productPrice))
           log(`Se ha vendido ${productData.name} a un precio de ${inStockProduct.val().productPrice} en @${productData.site}`)
         }
         log(`NO hay stock de ${productData.name} en @${productData.site}`)
+        deleteProductStock(productData.id)
       }
     } catch (e) {
       log(`No se ha podido obtener información de ${productData.name} en @${productData.site}\n${e}`)
-      db.ref('/errors').push({
-        msg: `No se ha podido obtener información de ${productData.name} en @${productData.site}`,
-        date: Date.now(),
-        details: e,
-      })
       newEntry.update({
         loading: false,
       })
@@ -114,37 +64,25 @@ async function init() {
     await tab.close()
   }
 
-  const checkStock = async (productList: Product[]) => {
+  const checkStock = async () => {
+    const productData = await getProductList()
+    if (!productData.val()) {
+      log(`No se han encontrado productos para comprobar.`)
+      return
+    }
+    const productList: Product[] = Object.entries(productData.val()).map(mapKeyToId)
     await Promise.all(productList.map(async (p, i) => {
       return new Promise<void>(resolve => {
         setTimeout(async () => {
           await checkProduct(p)
           resolve()
-        }, i * 15 * 1000)
+        }, i * 10 * 1000)
       })
     }))
-    const productData = await db.ref('/products').get()
-    if (!productData.val()) {
-      db.ref('/errors').push({
-        msg: `No se han encontrado productos para comprobar.`,
-        date: Date.now(),
-      })
-      return
-    }
-    const newProductList: Product[] = Object.entries(productData.val()).map(([key, value]: [string, Product]) => ({ id: key, ...value }))
-    setTimeout(() => checkStock(newProductList), 15 * 1000)
+    setTimeout(() => checkStock(), 10 * 1000)
   }
 
-  const productData = await db.ref('/products').get()
-  if (!productData.val()) {
-    db.ref('/errors').push({
-      msg: `No se han encontrado productos para comprobar.`,
-      date: Date.now(),
-    })
-    return
-  }
-  const productList: Product[] = Object.entries(productData.val()).map(([key, value]: [string, Product]) => ({ id: key, ...value }))
-  checkStock(productList)
+  checkStock()
 }
 
-init()
+programLoop()

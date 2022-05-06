@@ -1,7 +1,10 @@
-import config from "./config"
-import fetch from 'node-fetch'
+import pushedConfig from "./config"
 import { Product } from "./src/types"
 import { appendFile } from 'fs/promises'
+import { db } from "./src/lib/db"
+
+const fetch = require('node-fetch')
+const FormData = require('form-data')
 
 // https://gist.github.com/hurjas/2660489
 export function timeStamp() {
@@ -35,11 +38,11 @@ export function timeStamp() {
 }
 
 export async function sendNotification(productData: Product) {
-  if (!config?.app_key) throw new Error('No Pushed configuration available')
+  if (!pushedConfig?.app_key) throw new Error('No Pushed configuration available')
 
   const formData = new FormData()
-  formData.append('app_key', config.app_key)
-  formData.append('app_secret', config.app_secret)
+  formData.append('app_key', pushedConfig.app_key)
+  formData.append('app_secret', pushedConfig.app_secret)
   formData.append('target_type', 'app')
   formData.append('content', `Hay stock de ${productData.name} en @${productData.site}`)
   formData.append('content_type', 'url')
@@ -55,9 +58,21 @@ export function log(...info: string[]): void {
   console.log(...info.map(l => `[${timeStamp()}] ${l}`))
   appendFile('log', info.map(l => `[${timeStamp()}] ${l}`).join('\n'), 'utf8')
     .catch(() => { })
+  db.ref('/errors').push({
+    msg: 'No se ha podido enviar la notificación de Pushed',
+    date: Date.now(),
+    details: info.map(l => `[${timeStamp()}] ${l}`),
+  })
 }
 
 export function todayYYYYMDD() {
   const date = new Date()
   return `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`
+}
+
+export const calculateAveragePrice = (previousPrices: number[], productPrice: number): number => {
+  return Object.values(previousPrices).reduce((acc, cur) => {
+    acc += cur
+    return acc
+  }, productPrice) / (previousPrices.length + 1)
 }

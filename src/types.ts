@@ -16,3 +16,8 @@ export interface EvaluationResponse {
   isInStock: boolean,
   price: string,
 }
+
+export interface PushedAPICredentials {
+  app_key: string,
+  app_secret: string,
+}
