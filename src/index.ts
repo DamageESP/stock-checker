@@ -3,14 +3,19 @@ import { setProductStock, createEmptyEvaluationData, postSale, updateEvaluationD
 import { EvaluationResponse, Product } from './types';
 import { mapKeyToId } from './helpers/firebaseHelper';
 
-const puppeteer = require('puppeteer')
+import puppeteer from 'puppeteer'
+const isWin = process.platform === "win32"
 
 export async function programLoop() {
-  const browser = await puppeteer.launch({
-    headless: true,
-    /* executablePath: '/usr/bin/chromium-browser',
-    args: ['--no-sandbox'], */
-  })
+  let puppetteerOtions: puppeteer.LaunchOptions = {
+    headless: true
+  }
+  if (!isWin) puppetteerOtions = {
+    ...puppetteerOtions,
+    executablePath: '/usr/bin/chromium-browser',
+    args: ['--no-sandbox']
+  }
+  const browser = await puppeteer.launch(puppetteerOtions)
 
   const checkProduct = async (productData: Product) => {
     const tab = await browser.newPage()
@@ -27,7 +32,7 @@ export async function programLoop() {
     const newEntry = createEmptyEvaluationData(productData, queryDate)
     try {
       await tab.goto(productData.url)
-      const evaluationData: EvaluationResponse = await tab.evaluate(siteEvaluator)
+      const evaluationData: EvaluationResponse = await tab.evaluate(siteEvaluator) as EvaluationResponse
       updateEvaluationData(newEntry, evaluationData)
       if (evaluationData.isInStock) {
         setProductStock(productData, evaluationData, queryDate)
