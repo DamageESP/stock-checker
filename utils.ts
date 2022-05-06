@@ -1,7 +1,6 @@
 import pushedConfig from "./config"
 import { Product } from "./src/types"
 import { appendFile } from 'fs/promises'
-import { db } from "./src/lib/db"
 
 const fetch = require('node-fetch')
 const FormData = require('form-data')
@@ -58,11 +57,11 @@ export function log(...info: string[]): void {
   console.log(...info.map(l => `[${timeStamp()}] ${l}`))
   appendFile('log', info.map(l => `[${timeStamp()}] ${l}`).join('\n'), 'utf8')
     .catch(() => { })
-  db.ref('/errors').push({
+  /* db.ref('/errors').push({
     msg: 'No se ha podido enviar la notificación de Pushed',
     date: Date.now(),
     details: info.map(l => `[${timeStamp()}] ${l}`),
-  })
+  }) */
 }
 
 export function todayYYYYMDD() {
