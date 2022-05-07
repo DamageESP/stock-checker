@@ -1,7 +1,7 @@
 import { calculateAveragePrice, log, sendNotification } from "../utils"
 import { setProductStock, createEmptyEvaluationData, postSale, updateEvaluationData, getStockForProduct, getAveragePriceDataForProduct, getSellingPricesForProduct, setSellingDataForProduct, addSellingPriceForProduct, getProductList, deleteProductStock } from './services/productService';
 import { EvaluationResponse, Product } from './types';
-import { mapKeyToId } from './helpers/firebaseHelper';
+import { mapKeyToId, sortOldestCheckedFirst } from './helpers/firebaseHelper';
 
 import puppeteer from 'puppeteer'
 const isWin = process.platform === "win32"
@@ -75,7 +75,7 @@ export async function programLoop() {
       log(`No se han encontrado productos para comprobar.`)
       return
     }
-    const productList: Product[] = Object.entries(productData.val()).map(mapKeyToId)
+    const productList: Product[] = Object.entries(productData.val() as Product[]).map(mapKeyToId).sort(sortOldestCheckedFirst)
     await Promise.all(productList.map(async (p, i) => {
       return new Promise<void>(resolve => {
         setTimeout(async () => {

@@ -3,6 +3,7 @@ export interface Product {
   site: string,
   url: string,
   name: string,
+  lastChecked?: number
 }
 
 export interface ProductDataLog extends Product {

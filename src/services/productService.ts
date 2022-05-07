@@ -29,6 +29,7 @@ export const updateEvaluationData = (productRef: ThenableReference, evaluationDa
     loading: false,
     isInStock: evaluationData.isInStock,
     productPrice: evaluationData.price,
+    lastChecked: Date.now(),
   })
 }
 
